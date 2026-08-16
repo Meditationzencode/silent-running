@@ -1,0 +1,18 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Import the project's packages from the repo root without an editable install.
+pythonpath = ["."]
+addopts = "-q"
+
+[tool.coverage.run]
+# Coverage is only ever measured against the two pure layers — they are the ones
+# the >=90% target applies to, and the ones worth proving exhaustively.
+source = ["engine", "perception"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+]

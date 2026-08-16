@@ -1,0 +1,9 @@
+# Silent Running — direct dependencies (Python 3.11+)
+# Pinned so CI and a fresh clone reproduce the environment this was built against.
+
+fastapi==0.141.1
+uvicorn==0.52.3
+pytest==9.1.1
+pytest-cov==7.1.0
+hypothesis==6.165.9
+httpx==0.28.1
