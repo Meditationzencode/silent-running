@@ -1,0 +1,4 @@
+# Normalise line endings to LF in the repository and in the working tree.
+# Development is on Windows but CI runs on Linux; without this, checkouts drift
+# to CRLF and every file shows as modified.
+* text=auto eol=lf
