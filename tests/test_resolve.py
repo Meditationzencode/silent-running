@@ -357,6 +357,21 @@ def test_an_emission_is_recorded_at_the_post_move_cell() -> None:
     assert events.emissions[0].position == (10, 12)
 
 
+def test_the_round_events_ride_on_the_new_state() -> None:
+    """Both players poll at different moments; both must see the same round."""
+    state = make_state((10, 10), (16, 13))
+
+    new_state, events = resolve(state, Move("E"), Ping(), rng())
+
+    assert new_state.last_events is events
+
+
+def test_a_fresh_match_has_no_prior_events() -> None:
+    from engine import new_match
+
+    assert new_match(seed=1).last_events is None
+
+
 def test_the_engine_grants_no_fix_for_a_ping() -> None:
     """Ping range gating is perception's job; the engine only records the noise."""
     state = make_state((10, 10), (11, 11))

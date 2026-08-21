@@ -121,16 +121,10 @@ def resolve(
         for player, ship in state.ships.items()
     }
 
-    next_round = state.round + 1
-    new_state = replace(
-        state,
-        ships=new_ships,
-        round=next_round,
-        outcome=_outcome(new_ships, next_round, state.config),
-    )
-
-    # (d) Detection hook — the raw emissions go back to the caller; perception
-    #     decides who was close enough to hear what, and how badly to blur it.
+    # (d) Detection hook — the raw emissions are recorded, not interpreted.
+    #     perception decides who was close enough to hear what, and how badly to
+    #     blur it. They ride on the new state so that both players see the same
+    #     round's contacts however far apart their polls land.
     events = RoundEvents(
         round=state.round,
         emissions=emissions,
@@ -145,6 +139,15 @@ def resolve(
             )
             for player in actions
         },
+    )
+
+    next_round = state.round + 1
+    new_state = replace(
+        state,
+        ships=new_ships,
+        round=next_round,
+        outcome=_outcome(new_ships, next_round, state.config),
+        last_events=events,
     )
     return new_state, events
 

@@ -150,6 +150,19 @@ class GameState:
     outcome: Outcome = Outcome.ONGOING
     config: GameConfig = DEFAULT
 
+    last_events: RoundEvents | None = None
+    """What the round that produced this state emitted. None before round 1.
+
+    Emissions are transient — they exist for one round and are gone — but they
+    still have to *survive* that round, because the two players poll at
+    different moments: P1 may fetch their view instantly and P2 five seconds
+    later, and both must see the same round's contacts. Anything the server must
+    hold between requests is state, so this is where it belongs.
+
+    Keeping it here is also what lets ``perception.view_for(state, player, rng)``
+    stay a pure function of the state alone, exactly as design §4.1 specifies.
+    """
+
 
 # --- What a round produces -------------------------------------------------
 
@@ -209,12 +222,17 @@ class RoundResult:
 
     Player-relative on purpose: "you" is whoever this result is keyed to. It
     reports outcomes, never positions.
+
+    Design §5 sketches a third field, ``your_ping_result``, which is deliberately
+    absent. PRD §4 is explicit that an ACTIVE_FIX is delivered "in the pinger's
+    ``contacts``", and PRD §6 pins ``last_result`` to exactly these two booleans.
+    Carrying the fix in both places would mean two code paths that could
+    disagree about whether a player is entitled to an exact cell — the one kind
+    of duplication this project cannot afford.
     """
 
     you_were_hit: bool
     you_hit_enemy: bool
-    your_ping_result: Contact | None = None
-    """Filled by ``perception`` in phase 2 — the engine does no range gating."""
 
 
 @dataclass(frozen=True, slots=True)
