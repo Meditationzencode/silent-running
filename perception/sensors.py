@@ -63,7 +63,11 @@ def noised_bearing_deg(
     distance = euclidean_distance(origin, target)
     sigma = bearing_sigma_deg(distance, config)
     noised = true_bearing_deg(origin, target) + rng.gauss(0.0, sigma)
-    return round(noised % 360.0, BEARING_DECIMALS)
+
+    # Wrap, round, then wrap again. The second wrap is not redundant: rounding
+    # 359.97 to one decimal produces 360.0, which is not a compass bearing. The
+    # leak-invariant property test found this within a few hundred examples.
+    return round(noised % 360.0, BEARING_DECIMALS) % 360.0
 
 
 def range_bucket(
