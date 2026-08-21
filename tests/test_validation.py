@@ -1,5 +1,3 @@
-"""The server refuses to enter an illegal state; these are the refusals."""
-
 from __future__ import annotations
 
 import pytest
@@ -11,27 +9,24 @@ from engine.validation import InvalidAction, validate_action
 
 @pytest.mark.parametrize("direction", sorted(DIRECTION_VECTORS))
 def test_all_eight_compass_directions_are_legal(direction: str) -> None:
-    validate_action(Move(direction))  # type: ignore[arg-type]
+    validate_action(Move(direction))
 
 
 @pytest.mark.parametrize("direction", ["UP", "n", "NNE", "", "NE ", "north"])
 def test_an_unknown_direction_is_rejected(direction: str) -> None:
-    """PRD §3: {"error": "invalid_direction"} -> 400."""
     with pytest.raises(InvalidAction) as excinfo:
-        validate_action(Move(direction))  # type: ignore[arg-type]
+        validate_action(Move(direction))
 
     assert excinfo.value.code == "invalid_direction"
 
 
 @pytest.mark.parametrize("target", [(0, 0), (24, 24), (0, 24), (24, 0), (12, 12)])
 def test_any_on_grid_cell_is_a_legal_target(target: tuple[int, int]) -> None:
-    """Corners included — blind fire anywhere on the board is the point."""
     validate_action(Fire(target))
 
 
 @pytest.mark.parametrize("target", [(26, 4), (-1, 0), (0, -1), (25, 24), (24, 25)])
 def test_an_off_grid_target_is_rejected(target: tuple[int, int]) -> None:
-    """PRD §3 names this case exactly, including the (26,4) example."""
     with pytest.raises(InvalidAction) as excinfo:
         validate_action(Fire(target))
 
@@ -40,10 +35,9 @@ def test_an_off_grid_target_is_rejected(target: tuple[int, int]) -> None:
 
 
 def test_a_structurally_broken_target_is_rejected() -> None:
-    """The engine does not assume the caller is the server's request model."""
     for bad in [(1,), (1, 2, 3), "12", (1.5, 2.0), (True, False), None]:
         with pytest.raises(InvalidAction) as excinfo:
-            validate_action(Fire(bad))  # type: ignore[arg-type]
+            validate_action(Fire(bad))
         assert excinfo.value.code == "target_out_of_bounds"
 
 
@@ -53,13 +47,12 @@ def test_parameterless_actions_are_always_legal() -> None:
 
 
 def test_firing_at_your_own_cell_is_legal() -> None:
-    """Deliberate: the engine must not second-guess a named target."""
     validate_action(Fire((10, 10)))
 
 
 def test_an_unknown_action_type_is_rejected() -> None:
     with pytest.raises(InvalidAction) as excinfo:
-        validate_action(object())  # type: ignore[arg-type]
+        validate_action(object())
 
     assert excinfo.value.code == "invalid_action"
 

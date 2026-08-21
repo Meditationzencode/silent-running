@@ -1,10 +1,3 @@
-"""Shared Hypothesis strategies and payload helpers.
-
-Kept in one place because the leak invariant and the determinism proof must
-explore the *same* input space — if they drifted apart, the determinism test
-could be passing on states the leak test never reaches, or vice versa.
-"""
-
 from __future__ import annotations
 
 from typing import Any
@@ -37,11 +30,6 @@ actions = st.one_of(
 
 @st.composite
 def game_states(draw: st.DrawFn) -> GameState:
-    """Any legal mid-match position, including both ships on the same cell.
-
-    Hulls up to 3 so the space includes matches a single hit does not end;
-    rounds stop short of the cap so ``resolve`` is always given a live match.
-    """
     hull = draw(st.integers(min_value=1, max_value=3))
     return GameState(
         ships={
@@ -54,12 +42,6 @@ def game_states(draw: st.DrawFn) -> GameState:
 
 
 def coordinates_in(node: Any) -> list[tuple[int, int]]:
-    """Every (x, y) pair anywhere in a JSON payload, however deeply nested.
-
-    Walks the decoded JSON rather than regex-scanning the text, so it cannot be
-    fooled by a coordinate buried in a nested structure, and cannot raise a false
-    alarm on a round number that happens to read like a cell.
-    """
     if isinstance(node, dict):
         return [cell for value in node.values() for cell in coordinates_in(value)]
     if isinstance(node, (list, tuple)):

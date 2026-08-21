@@ -1,5 +1,3 @@
-"""Placement must be random, on-grid, non-adjacent and reproducible."""
-
 from __future__ import annotations
 
 import random
@@ -17,7 +15,6 @@ SEEDS = range(200)
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_ships_start_on_grid_and_non_adjacent(seed: int) -> None:
-    """The one rule placement has to obey, checked across many seeds."""
     ships = place_ships(random.Random(seed))
     p1, p2 = ships[PlayerId.P1].position, ships[PlayerId.P2].position
 
@@ -27,12 +24,10 @@ def test_ships_start_on_grid_and_non_adjacent(seed: int) -> None:
 
 
 def test_placement_is_reproducible_from_the_seed() -> None:
-    """Same seed, same board — the property every other test relies on."""
     assert place_ships(random.Random(7)) == place_ships(random.Random(7))
 
 
 def test_placement_actually_varies_between_seeds() -> None:
-    """Guards against a 'random' placement that quietly always returns a corner."""
     boards = {
         (
             place_ships(random.Random(s))[PlayerId.P1].position,
@@ -52,13 +47,11 @@ def test_ships_start_with_the_configured_hull() -> None:
 
 @pytest.mark.parametrize("grid_size", [1, 2])
 def test_a_grid_too_small_for_two_ships_is_refused(grid_size: int) -> None:
-    """Better a loud failure than an unbounded search for a cell that cannot exist."""
     with pytest.raises(ValueError, match="too small"):
         place_ships(random.Random(0), replace(DEFAULT, grid_size=grid_size))
 
 
 def test_smallest_workable_grid_still_places_ships() -> None:
-    """3x3 is the boundary case: (0,0) and (2,2) are non-adjacent."""
     ships = place_ships(random.Random(0), replace(DEFAULT, grid_size=3))
     positions = [ship.position for ship in ships.values()]
 

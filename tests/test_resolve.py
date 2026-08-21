@@ -1,10 +1,3 @@
-"""Round resolution: the fixed order, the blast maths, and the endings.
-
-Every test here pins a rule from design §2.5-§2.6 or PRD §8. Positions are set
-explicitly rather than placed randomly, because the point is to check the rule,
-not the placement.
-"""
-
 from __future__ import annotations
 
 import random
@@ -38,7 +31,6 @@ def make_state(
     hull: int = 1,
     config: GameConfig = DEFAULT,
 ) -> GameState:
-    """A match with both ships placed exactly where a test needs them."""
     return GameState(
         ships={
             P1: ShipState(position=p1, hull=hull),
@@ -54,35 +46,23 @@ def rng() -> random.Random:
     return random.Random(0)
 
 
-# --- The milestone: a full round resolves correctly -------------------------
-
-
 def test_a_full_round_resolves_correctly() -> None:
-    """P1 burns east while P2 fires at where P1 used to be, and misses.
-
-    Exercises the whole fixed order in one case: movement, emissions at
-    post-move positions, detonation against those positions, and the results.
-    """
     state = make_state((10, 10), (16, 13))
 
     new_state, events = resolve(state, Move("E"), Fire((10, 10)), rng())
 
-    # (a) movement: P1 burned two cells east; P2 fired, so it stayed put.
     assert new_state.ships[P1].position == (12, 10)
     assert new_state.ships[P2].position == (16, 13)
 
-    # (b) emissions, at post-movement positions.
     assert {(e.source, e.kind, e.position) for e in events.emissions} == {
         (P1, "HEAT", (12, 10)),
         (P2, "LAUNCH", (16, 13)),
     }
 
-    # (c) the torpedo detonated on the cell P1 had already left.
     assert len(events.detonations) == 1
     assert events.detonations[0].target == (10, 10)
     assert events.detonations[0].caught == ()
 
-    # ...so nobody was hurt, and the match rolls on.
     assert new_state.ships[P1].hull == 1
     assert new_state.ships[P1].alive
     assert new_state.outcome is Outcome.ONGOING
@@ -90,9 +70,6 @@ def test_a_full_round_resolves_correctly() -> None:
     assert events.round == 1
     assert events.results[P1].you_were_hit is False
     assert events.results[P2].you_hit_enemy is False
-
-
-# --- Movement ---------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
@@ -111,10 +88,9 @@ def test_a_full_round_resolves_correctly() -> None:
 def test_each_direction_moves_the_full_distance(
     start: Coord, direction: str, expected: Coord
 ) -> None:
-    """y increases north, per the bearing convention in PRD §4."""
     state = make_state(start, (0, 0))
 
-    new_state, _ = resolve(state, Move(direction), RunSilent(), rng())  # type: ignore[arg-type]
+    new_state, _ = resolve(state, Move(direction), RunSilent(), rng())
 
     assert new_state.ships[P1].position == expected
 
@@ -134,16 +110,14 @@ def test_each_direction_moves_the_full_distance(
 def test_a_move_into_a_wall_clamps_rather_than_failing(
     start: Coord, direction: str, expected: Coord
 ) -> None:
-    """PRD §3: the ship stops at the wall; the move is never rejected."""
     state = make_state(start, (12, 0))
 
-    new_state, _ = resolve(state, Move(direction), RunSilent(), rng())  # type: ignore[arg-type]
+    new_state, _ = resolve(state, Move(direction), RunSilent(), rng())
 
     assert new_state.ships[P1].position == expected
 
 
 def test_two_ships_may_end_a_round_on_the_same_cell() -> None:
-    """Design §2.5: collision is not modelled; only a torpedo kills."""
     state = make_state((10, 10), (14, 10))
 
     new_state, _ = resolve(state, Move("E"), Move("W"), rng())
@@ -153,13 +127,10 @@ def test_two_ships_may_end_a_round_on_the_same_cell() -> None:
     assert new_state.outcome is Outcome.ONGOING
 
 
-# --- Blast maths ------------------------------------------------------------
-
-
 @pytest.mark.parametrize(
     "enemy_cell",
     [
-        (10, 10),  # dead centre
+        (10, 10),
         (9, 9),
         (9, 10),
         (9, 11),
@@ -167,7 +138,7 @@ def test_two_ships_may_end_a_round_on_the_same_cell() -> None:
         (10, 11),
         (11, 9),
         (11, 10),
-        (11, 11),  # the eight edge cells of the 3x3
+        (11, 11),
     ],
 )
 def test_anything_inside_the_3x3_is_hit(enemy_cell: Coord) -> None:
@@ -187,7 +158,6 @@ def test_anything_inside_the_3x3_is_hit(enemy_cell: Coord) -> None:
     [(8, 10), (12, 10), (10, 8), (10, 12), (8, 8), (12, 12), (9, 12), (12, 11)],
 )
 def test_anything_just_outside_the_3x3_is_missed(enemy_cell: Coord) -> None:
-    """One cell further out and the torpedo is wasted."""
     state = make_state((20, 20), enemy_cell)
 
     new_state, events = resolve(state, Fire((10, 10)), RunSilent(), rng())
@@ -199,7 +169,6 @@ def test_anything_just_outside_the_3x3_is_missed(enemy_cell: Coord) -> None:
 
 
 def test_moving_out_of_a_targeted_cell_dodges_the_torpedo() -> None:
-    """Movement resolves before detonation — the core §2.5 consequence."""
     state = make_state((0, 0), (10, 10))
 
     new_state, events = resolve(state, Fire((10, 10)), Move("E"), rng())
@@ -210,7 +179,6 @@ def test_moving_out_of_a_targeted_cell_dodges_the_torpedo() -> None:
 
 
 def test_moving_only_to_the_blast_edge_does_not_dodge() -> None:
-    """A dodge has to clear the whole 3x3, not just the centre cell."""
     state = make_state((0, 0), (10, 12))
 
     new_state, _ = resolve(state, Fire((10, 10)), Move("S"), rng())
@@ -220,16 +188,12 @@ def test_moving_only_to_the_blast_edge_does_not_dodge() -> None:
 
 
 def test_a_ship_is_not_caught_in_its_own_blast() -> None:
-    """v1 does not model self-damage; see _detonate for the reasoning."""
     state = make_state((10, 10), (20, 20))
 
     new_state, events = resolve(state, Fire((10, 10)), RunSilent(), rng())
 
     assert new_state.ships[P1].alive
     assert events.detonations[0].caught == ()
-
-
-# --- Hull and death ---------------------------------------------------------
 
 
 def test_a_hit_decrements_the_hull_without_killing_a_tougher_ship() -> None:
@@ -254,9 +218,6 @@ def test_successive_hits_eventually_kill() -> None:
     assert state.outcome is Outcome.P1_WINS
 
 
-# --- Endings ----------------------------------------------------------------
-
-
 def test_killing_the_enemy_wins_the_match() -> None:
     state = make_state((0, 0), (10, 10))
 
@@ -266,7 +227,6 @@ def test_killing_the_enemy_wins_the_match() -> None:
 
 
 def test_p2_can_win_too() -> None:
-    """Guards against an outcome check that only ever looks at one player."""
     state = make_state((10, 10), (0, 0))
 
     new_state, _ = resolve(state, RunSilent(), Fire((10, 10)), rng())
@@ -275,7 +235,6 @@ def test_p2_can_win_too() -> None:
 
 
 def test_simultaneous_double_kill_is_a_draw() -> None:
-    """Design §2.5: a dying ship's torpedo still arrives. Nobody is credited."""
     state = make_state((5, 5), (15, 15))
 
     new_state, events = resolve(state, Fire((15, 15)), Fire((5, 5)), rng())
@@ -290,7 +249,6 @@ def test_simultaneous_double_kill_is_a_draw() -> None:
 
 
 def test_reaching_the_round_cap_with_both_alive_is_a_draw() -> None:
-    """round_cap rounds get played; the match ends as the counter would pass it."""
     state = make_state((0, 0), (24, 24), round=DEFAULT.round_cap)
 
     new_state, _ = resolve(state, RunSilent(), RunSilent(), rng())
@@ -308,7 +266,6 @@ def test_the_round_before_the_cap_is_still_ongoing() -> None:
 
 
 def test_a_kill_on_the_final_round_is_a_win_not_a_draw() -> None:
-    """The cap is checked last, and only if both ships are still alive."""
     state = make_state((0, 0), (10, 10), round=DEFAULT.round_cap)
 
     new_state, _ = resolve(state, Fire((10, 10)), RunSilent(), rng())
@@ -324,11 +281,7 @@ def test_a_finished_match_cannot_be_resolved_again() -> None:
         resolve(finished, RunSilent(), RunSilent(), rng())
 
 
-# --- Emissions (the detection hook) ----------------------------------------
-
-
 def test_running_silent_emits_nothing() -> None:
-    """The whole reason Run Silent is the safe default."""
     state = make_state((10, 10), (16, 13))
 
     _, events = resolve(state, RunSilent(), RunSilent(), rng())
@@ -343,13 +296,12 @@ def test_running_silent_emits_nothing() -> None:
 def test_every_other_action_emits(action: object, kind: str) -> None:
     state = make_state((10, 10), (16, 13))
 
-    _, events = resolve(state, action, RunSilent(), rng())  # type: ignore[arg-type]
+    _, events = resolve(state, action, RunSilent(), rng())
 
     assert [(e.source, e.kind) for e in events.emissions] == [(P1, kind)]
 
 
 def test_an_emission_is_recorded_at_the_post_move_cell() -> None:
-    """A ship cannot leave its heat trail on the cell it just vacated."""
     state = make_state((10, 10), (16, 13))
 
     _, events = resolve(state, Move("N"), RunSilent(), rng())
@@ -358,7 +310,6 @@ def test_an_emission_is_recorded_at_the_post_move_cell() -> None:
 
 
 def test_the_round_events_ride_on_the_new_state() -> None:
-    """Both players poll at different moments; both must see the same round."""
     state = make_state((10, 10), (16, 13))
 
     new_state, events = resolve(state, Move("E"), Ping(), rng())
@@ -373,7 +324,6 @@ def test_a_fresh_match_has_no_prior_events() -> None:
 
 
 def test_the_engine_grants_no_fix_for_a_ping() -> None:
-    """Ping range gating is perception's job; the engine only records the noise."""
     state = make_state((10, 10), (11, 11))
 
     _, events = resolve(state, Ping(), RunSilent(), rng())
@@ -382,11 +332,7 @@ def test_the_engine_grants_no_fix_for_a_ping() -> None:
     assert events.detonations == ()
 
 
-# --- Purity and determinism -------------------------------------------------
-
-
 def test_resolve_is_deterministic() -> None:
-    """Same inputs, same outputs — what every other test depends on."""
     state = make_state((10, 10), (16, 13))
 
     first = resolve(state, Move("NE"), Fire((12, 12)), random.Random(99))
@@ -396,7 +342,6 @@ def test_resolve_is_deterministic() -> None:
 
 
 def test_resolve_does_not_mutate_the_state_it_was_given() -> None:
-    """Purity, checked rather than asserted in a docstring."""
     state = make_state((10, 10), (10, 11))
 
     resolve(state, Move("NE"), Fire((10, 11)), rng())
@@ -410,7 +355,6 @@ def test_resolve_does_not_mutate_the_state_it_was_given() -> None:
 
 
 def test_resolve_honours_a_non_default_config() -> None:
-    """Tunables come from the state's config, not from module constants."""
     brisk = replace(DEFAULT, move_distance=5, blast_radius=2)
     state = make_state((10, 10), (12, 12), config=brisk)
 
@@ -429,7 +373,7 @@ def test_an_invalid_action_is_refused_before_anything_moves() -> None:
     state = make_state((10, 10), (16, 13))
 
     with pytest.raises(InvalidAction):
-        resolve(state, Move("UP"), RunSilent(), rng())  # type: ignore[arg-type]
+        resolve(state, Move("UP"), RunSilent(), rng())
     with pytest.raises(InvalidAction):
         resolve(state, RunSilent(), Fire((99, 99)), rng())
 

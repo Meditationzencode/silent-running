@@ -1,10 +1,3 @@
-"""The two distance metrics, pinned against the spec's worked examples.
-
-Worth testing separately because using the wrong one is a silent, plausible bug:
-Euclidean blast geometry would quietly make the torpedo a plus-shape, and
-Chebyshev ranging would quietly widen every sensor bucket on the diagonals.
-"""
-
 from __future__ import annotations
 
 import pytest
@@ -19,7 +12,6 @@ from engine.models import Coord
 
 
 def test_euclidean_matches_the_prd_worked_example() -> None:
-    """PRD §4: your ship (10,10), enemy (16,13), separation ~= 6.7 cells."""
     assert euclidean_distance((10, 10), (16, 13)) == pytest.approx(6.708, abs=1e-3)
 
 
@@ -30,7 +22,6 @@ def test_euclidean_is_symmetric_and_zero_on_the_same_cell() -> None:
 
 
 def test_the_two_metrics_disagree_on_diagonals() -> None:
-    """The reason both exist: a diagonal neighbour is 1 king-move but 1.41 away."""
     diagonal: Coord = (1, 1)
     assert chebyshev_distance((0, 0), diagonal) == 1
     assert euclidean_distance((0, 0), diagonal) == pytest.approx(2**0.5)

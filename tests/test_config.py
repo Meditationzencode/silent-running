@@ -1,14 +1,3 @@
-"""Locks the default tunables to the agreed spec.
-
-These numbers are a design contract, not implementation detail — the sensor
-maths, the AI difficulty curve and the balance discussion all assume them. A
-test here means an accidental edit shows up as a failure rather than as a subtly
-different game.
-
-It also serves as the Phase 0 smoke test: if this runs, the venv, the package
-layout and the pytest/pythonpath wiring are all correct.
-"""
-
 from dataclasses import FrozenInstanceError, replace
 
 import pytest
@@ -17,7 +6,6 @@ from config import DEFAULT, GameConfig
 
 
 def test_defaults_match_the_spec() -> None:
-    """Design doc §2.7, PRD §3-§5."""
     assert DEFAULT.grid_size == 25
     assert DEFAULT.move_distance == 2
     assert DEFAULT.ping_range == 12.0
@@ -32,20 +20,17 @@ def test_defaults_match_the_spec() -> None:
 
 
 def test_range_bucket_boundaries_match_the_sensor_model() -> None:
-    """CLOSE <= 6, MEDIUM 6-12, FAR 12-18, unheard beyond passive_range."""
     assert DEFAULT.bucket_close_max == 6.0
     assert DEFAULT.bucket_medium_max == 12.0
     assert DEFAULT.bucket_close_max < DEFAULT.bucket_medium_max < DEFAULT.passive_range
 
 
 def test_config_is_immutable() -> None:
-    """Purity depends on this: no layer may re-tune a live match's config."""
     with pytest.raises(FrozenInstanceError):
-        DEFAULT.hull = 3  # type: ignore[misc]
+        DEFAULT.hull = 3
 
 
 def test_a_variant_can_be_built_without_touching_the_default() -> None:
-    """How a more forgiving match (or a test) overrides one knob."""
     forgiving = replace(DEFAULT, hull=3)
     assert isinstance(forgiving, GameConfig)
     assert forgiving.hull == 3
