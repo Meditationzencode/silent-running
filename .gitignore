@@ -21,6 +21,10 @@ dist/
 coverage.xml
 htmlcov/
 
+# Local working files
+notes/
+docs/
+
 # Secrets and local environment
 .env
 .env.*
