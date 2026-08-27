@@ -273,6 +273,35 @@ def test_a_kill_on_the_final_round_is_a_win_not_a_draw() -> None:
     assert new_state.outcome is Outcome.P1_WINS
 
 
+def test_resigning_hands_the_win_to_the_opponent() -> None:
+    from engine import resign
+
+    state = make_state((10, 10), (16, 13))
+
+    assert resign(state, P1).outcome is Outcome.P2_WINS
+    assert resign(state, P2).outcome is Outcome.P1_WINS
+
+
+def test_resigning_leaves_the_board_untouched() -> None:
+    from engine import resign
+
+    state = make_state((10, 10), (16, 13))
+    resigned = resign(state, P1)
+
+    assert resigned.ships == state.ships
+    assert resigned.round == state.round
+
+
+def test_a_finished_match_cannot_be_resigned() -> None:
+    from engine import resign
+
+    state = make_state((0, 0), (10, 10))
+    finished, _ = resolve(state, Fire((10, 10)), RunSilent(), rng())
+
+    with pytest.raises(ValueError, match="has ended"):
+        resign(finished, P2)
+
+
 def test_a_finished_match_cannot_be_resolved_again() -> None:
     state = make_state((0, 0), (10, 10))
     finished, _ = resolve(state, Fire((10, 10)), RunSilent(), rng())

@@ -21,7 +21,7 @@ from engine.models import (
     ShipState,
 )
 from engine.placement import new_match, place_ships
-from engine.resolve import resolve
+from engine.resolve import resign, resolve
 from engine.validation import InvalidAction, validate_action
 
 __all__ = [
@@ -48,6 +48,7 @@ __all__ = [
     "ShipState",
     "new_match",
     "place_ships",
+    "resign",
     "resolve",
     "validate_action",
 ]

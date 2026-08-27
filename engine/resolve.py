@@ -101,6 +101,16 @@ def resolve(
     return new_state, events
 
 
+def resign(state: GameState, player: PlayerId) -> GameState:
+    if state.outcome is not Outcome.ONGOING:
+        raise ValueError(f"cannot resign a match that has ended ({state.outcome})")
+
+    return replace(
+        state,
+        outcome=Outcome.P2_WINS if player is PlayerId.P1 else Outcome.P1_WINS,
+    )
+
+
 def _move(position: Coord, action: Action, config: GameConfig) -> Coord:
     if not isinstance(action, Move):
         return position
