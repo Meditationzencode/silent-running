@@ -14,6 +14,8 @@ PlayerOutcome = Literal["ONGOING", "WIN", "LOSS", "DRAW"]
 
 @dataclass(frozen=True, slots=True)
 class PlayerView:
+    """What one player may see. There is deliberately no enemy-position field."""
+
     round: int
     phase: Phase
     your_ship: ShipState
@@ -27,6 +29,7 @@ FORBIDDEN_FIELD_NAMES = frozenset({"enemy", "enemy_ship", "enemy_position", "shi
 
 
 def to_payload(view: PlayerView) -> dict[str, Any]:
+    """The exact response body, built field by field so no new field ships itself."""
     return {
         "round": view.round,
         "phase": view.phase,

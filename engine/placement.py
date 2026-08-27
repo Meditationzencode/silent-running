@@ -12,6 +12,7 @@ MIN_START_SEPARATION = 2
 def place_ships(
     rng: random.Random, config: GameConfig = DEFAULT
 ) -> dict[PlayerId, ShipState]:
+    """Two random non-adjacent cells. Enumerates candidates so it always terminates."""
     cells = [(x, y) for x in range(config.grid_size) for y in range(config.grid_size)]
     first: Coord = rng.choice(cells)
 
@@ -34,6 +35,7 @@ def place_ships(
 
 
 def new_match(seed: int, config: GameConfig = DEFAULT) -> GameState:
+    """Opening state for a match. The seed is server-only and never sent to a client."""
     return GameState(
         ships=place_ships(random.Random(seed), config),
         round=1,

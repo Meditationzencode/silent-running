@@ -1,3 +1,5 @@
+"""The fog filter. An exact enemy cell reaches a player only via ACTIVE_FIX or PING_DETECTED."""
+
 from perception.models import (
     FORBIDDEN_FIELD_NAMES,
     OpponentStatus,

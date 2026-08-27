@@ -81,6 +81,7 @@ def _resolve_round(record: MatchRecord) -> None:
 
 @app.post("/matches", status_code=status.HTTP_201_CREATED)
 def create_match() -> SeatResponse:
+    """Create a match. The returned id doubles as the join code."""
     record, token = store.create()
     return SeatResponse(
         match_id=record.match_id,
@@ -92,6 +93,7 @@ def create_match() -> SeatResponse:
 
 @app.post("/matches/{match_id}/join")
 def join_match(match_id: str) -> SeatResponse:
+    """Take the second seat by join code."""
     record = _match(match_id)
     if record.is_full:
         raise ApiError(409, "match_full", "this match already has two players")
@@ -107,6 +109,7 @@ def join_match(match_id: str) -> SeatResponse:
 
 @app.get("/matches/{match_id}/view")
 def get_view(match_id: str, authorization: AuthHeader = None) -> dict[str, Any]:
+    """The caller's fogged view. The token alone decides which player is asking."""
     record = _match(match_id)
     return _view(record, _player(record, authorization))
 
@@ -115,6 +118,7 @@ def get_view(match_id: str, authorization: AuthHeader = None) -> dict[str, Any]:
 def submit_action(
     match_id: str, body: ActionRequest, authorization: AuthHeader = None
 ) -> ActionResponse:
+    """Submit one action. The round resolves only once both players have acted."""
     record = _match(match_id)
     player = _player(record, authorization)
 
@@ -139,6 +143,7 @@ def submit_action(
 
 @app.post("/matches/{match_id}/resign")
 def resign_match(match_id: str, authorization: AuthHeader = None) -> dict[str, Any]:
+    """Resign; the opponent wins."""
     record = _match(match_id)
     player = _player(record, authorization)
 
@@ -152,9 +157,12 @@ def resign_match(match_id: str, authorization: AuthHeader = None) -> dict[str, A
 
 @app.get("/matches/{match_id}/history")
 def get_history(match_id: str, authorization: AuthHeader = None) -> dict[str, Any]:
+    """The de-fogged record of both ships, available only once the match has ended."""
     record = _match(match_id)
     _player(record, authorization)
 
+    # The one endpoint that returns both ships' true tracks. It is safe only
+    # because the match is over, so this guard is the load-bearing line here.
     if record.state.outcome is Outcome.ONGOING:
         raise ApiError(
             409,

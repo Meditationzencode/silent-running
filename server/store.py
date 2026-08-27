@@ -44,6 +44,13 @@ class MatchRecord:
         return Random(f"{self.state.rng_seed}:{self.state.round}")
 
     def view_rng(self, player: PlayerId) -> Random:
+        """A stream derived per round, so a bearing does not change while you poll.
+
+        Not a live rng: view_for draws noise on every call, so a shared stream
+        would redraw on every GET and let a client average the fog away. Seeded
+        with a string because Random falls back to hash() for other types, and
+        string hashing is randomised per process.
+        """
         return Random(f"{self.state.rng_seed}:{self.state.round}:{player.value}")
 
 
@@ -52,6 +59,7 @@ class MatchStore:
         self._matches: dict[str, MatchRecord] = {}
 
     def create(self, config: GameConfig = DEFAULT) -> tuple[MatchRecord, str]:
+        """Open a match. The id is the join code, so it must be unguessable."""
         match_id = secrets.token_urlsafe(TOKEN_BYTES)
         record = MatchRecord(
             match_id=match_id,

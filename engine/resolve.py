@@ -39,6 +39,7 @@ def resolve(
     action_p2: Action,
     rng: random.Random,
 ) -> tuple[GameState, RoundEvents]:
+    """One simultaneous round: movement -> emissions -> torpedoes -> detection hook."""
     if state.outcome is not Outcome.ONGOING:
         raise ValueError(f"cannot resolve a match that has ended ({state.outcome})")
 
@@ -102,6 +103,7 @@ def resolve(
 
 
 def resign(state: GameState, player: PlayerId) -> GameState:
+    """Hand the win to the opponent. A win condition, so it lives here, not in server/."""
     if state.outcome is not Outcome.ONGOING:
         raise ValueError(f"cannot resign a match that has ended ({state.outcome})")
 
@@ -128,6 +130,8 @@ def _detonate(
     positions: Mapping[PlayerId, Coord],
     config: GameConfig,
 ) -> Detonation:
+    # The firer is excluded from their own blast: v1 models no self-damage, just as
+    # it models no collision. Not an oversight - one line to change if that shifts.
     return Detonation(
         source=source,
         target=target,

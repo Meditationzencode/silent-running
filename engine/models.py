@@ -21,6 +21,8 @@ class PlayerId(StrEnum):
 
 Direction = Literal["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
 
+# y increases north. The bearing convention in the sensor model (0 deg = east,
+# 90 deg = north) depends on it; flipping these signs inverts every bearing.
 DIRECTION_VECTORS: Mapping[Direction, Coord] = {
     "N": (0, 1),
     "NE": (1, 1),
@@ -72,6 +74,8 @@ class Outcome(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class GameState:
+    """The full truth. Lives only on the server, never serialized into a response."""
+
     ships: Mapping[PlayerId, ShipState]
     round: int
     rng_seed: int
@@ -103,6 +107,8 @@ RangeBucket = Literal["CLOSE", "MEDIUM", "FAR"]
 
 @dataclass(frozen=True, slots=True)
 class Contact:
+    """What a player may perceive. exact_position is set only for the two exact kinds."""
+
     kind: ContactKind
     bearing_deg: float | None = None
     range_bucket: RangeBucket | None = None

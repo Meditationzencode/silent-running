@@ -28,6 +28,7 @@ class ActionResponse(BaseModel):
 
 
 def to_action(request: ActionRequest) -> Action:
+    """Translate a request body into an engine Action. Legality is engine's call."""
     if request.type == "RUN_SILENT":
         return RunSilent()
     if request.type == "PING":
@@ -60,6 +61,7 @@ def ship_payload(ship: ShipState) -> dict[str, Any]:
 
 
 def history_payload(record: MatchRecord) -> dict[str, Any]:
+    """The de-fogged record. Only ever reachable once the match has ended."""
     return {
         "match_id": record.match_id,
         "outcome": record.state.outcome.value,

@@ -1,3 +1,5 @@
+"""Game rules. Pure and deterministic: no I/O, no globals, seeded rng."""
+
 from engine.models import (
     DIRECTION_VECTORS,
     Action,

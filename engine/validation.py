@@ -6,6 +6,8 @@ from engine.models import DIRECTION_VECTORS, Action, Fire, Move, Ping, RunSilent
 
 
 class InvalidAction(ValueError):
+    """A rejected action. server/ renders this as a 400 carrying its error code."""
+
     def __init__(self, code: str, detail: str) -> None:
         super().__init__(detail)
         self.code = code
@@ -13,6 +15,7 @@ class InvalidAction(ValueError):
 
 
 def validate_action(action: Action, config: GameConfig = DEFAULT) -> None:
+    """Raise InvalidAction if this action may not be submitted."""
     match action:
         case Move(direction=direction):
             if direction not in DIRECTION_VECTORS:

@@ -15,6 +15,7 @@ def view_for(
     phase: Phase = "AWAITING_ACTIONS",
     opponent_status: OpponentStatus = "CONNECTED",
 ) -> PlayerView:
+    """The fogged view one player may see. The only doorway between truth and a player."""
     return PlayerView(
         round=state.round,
         phase=phase,
