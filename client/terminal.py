@@ -19,7 +19,7 @@ def describe(contact: dict[str, Any]) -> str:
         x, y = contact["exact_position"]
         return f"{kind}: exact fix at ({x},{y})"
     return (
-        f"{kind}: bearing {contact['bearing_deg']:.1f} deg, "
+        f"{kind}: {contact['bearing_deg']:.1f} deg, "
         f"{BUCKETS[contact['range_bucket']]}"
     )
 
