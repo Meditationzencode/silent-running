@@ -156,6 +156,18 @@ have to close the distance; closing means burning; burning means emitting.
 **`client` / `ai`** — consume a `PlayerView` and return an action. They cannot cheat, not
 because they decline to look, but because they are never sent the enemy's position.
 
+### Polling is the heartbeat
+
+There is no scheduler. Every authenticated request runs the clock forward before
+doing anything else — applying turn timeouts, grace windows and abandonment — which
+works precisely because the clients poll. The traffic that keeps you visible is the
+same traffic that notices your opponent is gone.
+
+A missed turn becomes Run Silent: the no-leak default, so failing to act cannot be
+made to give a position away. Three in a row forfeits. Reconnecting is nothing at
+all — resume polling with the token you already have, because there was never a
+connection to re-establish.
+
 ### The auth boundary is the hidden-state boundary
 
 `GET /matches/{id}/view` takes no player parameter. The bearer token that authenticates
@@ -238,8 +250,8 @@ that is what should keep it below the levels above.
 | REST API, six endpoints, token-scoped views | built |
 | Terminal client — polling, actions, resign | built |
 | Five AI opponents, playable over HTTP | built |
-| Radar-style terminal UI | planned |
-| Timeouts, disconnect grace, reconnection | planned |
+| Radar-style terminal UI with contact history | built |
+| Timeouts, disconnect grace, reconnection | built |
 | Public deployment | planned |
 
 Two people can play a full match over HTTP today, or one person against any of the five
@@ -250,7 +262,7 @@ bots.
 ## Tests
 
 ```bash
-pytest                          # 510 tests
+pytest                          # 532 tests
 pytest --cov --cov-report=term  # 100% line and branch on engine + perception
 ```
 
