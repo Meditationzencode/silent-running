@@ -292,6 +292,24 @@ def test_resigning_leaves_the_board_untouched() -> None:
     assert resigned.round == state.round
 
 
+def test_voiding_a_match_ends_it_with_no_winner() -> None:
+    from engine import void
+
+    state = make_state((10, 10), (16, 13))
+
+    assert void(state).outcome is Outcome.DRAW
+
+
+def test_a_finished_match_cannot_be_voided() -> None:
+    from engine import void
+
+    state = make_state((0, 0), (10, 10))
+    finished, _ = resolve(state, Fire((10, 10)), RunSilent(), rng())
+
+    with pytest.raises(ValueError, match="has ended"):
+        void(finished)
+
+
 def test_a_finished_match_cannot_be_resigned() -> None:
     from engine import resign
 

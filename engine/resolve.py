@@ -103,7 +103,12 @@ def resolve(
 
 
 def resign(state: GameState, player: PlayerId) -> GameState:
-    """Hand the win to the opponent. A win condition, so it lives here, not in server/."""
+    """Hand the win to the opponent. A win condition, so it lives here, not in server/.
+
+    Covers every way one player stops being in the match - resigning, forfeiting
+    on timeouts, or abandoning it. The outcome is identical; why it happened is
+    session bookkeeping and stays in the server.
+    """
     if state.outcome is not Outcome.ONGOING:
         raise ValueError(f"cannot resign a match that has ended ({state.outcome})")
 
@@ -111,6 +116,14 @@ def resign(state: GameState, player: PlayerId) -> GameState:
         state,
         outcome=Outcome.P2_WINS if player is PlayerId.P1 else Outcome.P1_WINS,
     )
+
+
+def void(state: GameState) -> GameState:
+    """End with no winner: both players gone, or both out of turns at once."""
+    if state.outcome is not Outcome.ONGOING:
+        raise ValueError(f"cannot void a match that has ended ({state.outcome})")
+
+    return replace(state, outcome=Outcome.DRAW)
 
 
 def _move(position: Coord, action: Action, config: GameConfig) -> Coord:

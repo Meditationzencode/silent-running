@@ -19,6 +19,28 @@ def test_defaults_match_the_spec() -> None:
     assert DEFAULT.poll_interval_s == 1.0
 
 
+def test_participation_thresholds() -> None:
+    assert DEFAULT.max_consecutive_timeouts == 3
+    assert DEFAULT.grace_window_s == 60.0
+    assert DEFAULT.abandon_after_s == 180.0
+
+
+def test_a_player_is_abandoned_only_well_after_they_are_merely_quiet() -> None:
+    assert DEFAULT.grace_window_s < DEFAULT.abandon_after_s
+
+
+def test_a_present_but_idle_player_forfeits_before_they_look_abandoned() -> None:
+    """Otherwise the three-strike rule could never fire: absence would win first.
+
+    Someone who polls but never acts keeps their liveness fresh, so only the
+    turn timeout applies to them - and three of those must be reachable.
+    """
+    assert (
+        DEFAULT.max_consecutive_timeouts * DEFAULT.turn_timeout_s
+        > DEFAULT.abandon_after_s
+    )
+
+
 def test_range_bucket_boundaries_match_the_sensor_model() -> None:
     assert DEFAULT.bucket_close_max == 6.0
     assert DEFAULT.bucket_medium_max == 12.0

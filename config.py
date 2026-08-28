@@ -15,6 +15,9 @@ class GameConfig:
     hull: int = 2
     round_cap: int = 50
     turn_timeout_s: float = 90.0
+    max_consecutive_timeouts: int = 3
+    grace_window_s: float = 60.0
+    abandon_after_s: float = 180.0
     poll_interval_s: float = 1.0
 
 
