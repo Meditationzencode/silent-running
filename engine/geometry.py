@@ -25,3 +25,8 @@ def chebyshev_distance(a: Coord, b: Coord) -> int:
 def euclidean_distance(a: Coord, b: Coord) -> float:
     """Straight-line distance. The sensor metric: ranges model sound, not moves."""
     return math.hypot(a[0] - b[0], a[1] - b[1])
+
+
+def angular_gap(a: float, b: float) -> float:
+    """Shortest angle between two bearings, handling the wrap at 0/360."""
+    return abs((a - b + 180.0) % 360.0 - 180.0)

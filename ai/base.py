@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 
 from config import DEFAULT, GameConfig
 from engine import Action, Contact, Coord, Direction
-from engine.geometry import clamp_to_grid
+from engine.geometry import angular_gap, clamp_to_grid
 from perception import PlayerView
 
 COMPASS: tuple[Direction, ...] = ("E", "NE", "N", "NW", "W", "SW", "S", "SE")
@@ -32,11 +32,6 @@ class Bot(ABC):
     @abstractmethod
     def choose_action(self, view: PlayerView) -> Action:
         """Decide this round's action from the fogged view alone."""
-
-
-def angular_gap(a: float, b: float) -> float:
-    """Shortest angle between two bearings, handling the wrap at 0/360."""
-    return abs((a - b + 180.0) % 360.0 - 180.0)
 
 
 def bearing_to_direction(bearing_deg: float) -> Direction:
