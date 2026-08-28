@@ -12,7 +12,7 @@ class GameConfig:
     bearing_base_err_deg: float = 4.0
     bearing_err_per_cell_deg: float = 0.6
     blast_radius: int = 1
-    hull: int = 1
+    hull: int = 2
     round_cap: int = 50
     turn_timeout_s: float = 90.0
     poll_interval_s: float = 1.0

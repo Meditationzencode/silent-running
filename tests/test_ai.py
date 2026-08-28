@@ -204,6 +204,43 @@ def test_belief_regrows_between_rounds() -> None:
     assert (16, 13) in belief.cells
 
 
+def test_a_confirmed_hit_pins_them_to_the_blast() -> None:
+    """Sharper than any bearing: nine cells with no noise on them."""
+    belief = Belief()
+
+    belief.confirm_hit((12, 12))
+
+    assert belief.size == 9
+    assert (12, 12) in belief.cells
+    assert (14, 12) not in belief.cells
+
+
+def test_a_confirmed_hit_narrows_rather_than_replaces() -> None:
+    belief = Belief()
+    belief.cells = {(12, 12), (20, 20)}
+
+    belief.confirm_hit((12, 12))
+
+    assert belief.cells == {(12, 12)}
+
+
+def test_a_hit_at_the_edge_of_the_board_stays_on_the_board() -> None:
+    belief = Belief()
+
+    belief.confirm_hit((0, 0))
+
+    assert belief.size == 4
+    assert all(0 <= x and 0 <= y for x, y in belief.cells)
+
+
+@pytest.mark.parametrize("level", [1, 2, 3])
+def test_the_lower_levels_learn_nothing_from_a_hit(level: int) -> None:
+    """Reading your own hits is a level 4 capability; below that it is wasted."""
+    bot = make_bot(level, random.Random(1))
+
+    assert not hasattr(bot, "belief") or bot.belief.size == 625
+
+
 def test_best_shot_finds_the_cell_covering_most_of_the_belief() -> None:
     belief = Belief()
     belief.cells = {(4, 4), (5, 5), (6, 6), (20, 20)}

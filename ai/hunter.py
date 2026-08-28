@@ -28,12 +28,19 @@ class Hunter(Tracker):
 
     level = 4
     name = "Hunter"
-    FIRE_QUALITY = 0.16
+    FIRE_QUALITY = 0.10
     PING_BELIEF_SIZE = 140
     PING_RANGE_FRACTION = 0.9
     SWEEP_AFTER_QUIET_ROUNDS = 6
     APPROACH_BELIEF_SIZE = 150
     STAY_CHANCE = 0.55
+
+    def learn_from_last_shot(self, view: PlayerView) -> None:
+        """A connecting torpedo pins them to nine cells. Spend that."""
+        if self.last_fire_target is None or view.last_result is None:
+            return
+        if view.last_result.you_hit_enemy:
+            self.belief.confirm_hit(self.last_fire_target)
 
     def decide(self, view: PlayerView, own: Coord, just_pinged: bool) -> Action:
         if just_pinged:

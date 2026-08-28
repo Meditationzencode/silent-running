@@ -42,16 +42,23 @@ class Tracker(Bot):
         self.belief = Belief(self.config)
         self.quiet_rounds = 0
         self.pinged_last_round = False
+        self.last_fire_target: Coord | None = None
 
     def choose_action(self, view: PlayerView) -> Action:
         self.belief.advance(view)
+        self.learn_from_last_shot(view)
         own = view.your_ship.position
         self.quiet_rounds = 0 if view.contacts else self.quiet_rounds + 1
         just_pinged, self.pinged_last_round = self.pinged_last_round, False
 
         action = self.decide(view, own, just_pinged)
         self.pinged_last_round = isinstance(action, Ping)
+        self.last_fire_target = action.target if isinstance(action, Fire) else None
         return action
+
+    def learn_from_last_shot(self, view: PlayerView) -> None:
+        """Tracker throws this away. Knowing what a hit tells you is level 4."""
+        return
 
     def decide(self, view: PlayerView, own: Coord, just_pinged: bool) -> Action:
         target, quality = self.aim()

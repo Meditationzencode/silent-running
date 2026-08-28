@@ -62,6 +62,22 @@ class Belief:
         """Where a dodge could land them next round."""
         return self.spread(self.cells)
 
+    def confirm_hit(self, target: Coord) -> None:
+        """A torpedo that connected proves they were inside its blast.
+
+        Sharper than any bearing: the blast footprint is nine cells with no
+        noise on it at all. Only worth anything when a ship survives a hit,
+        which is why nothing used this while a single blast ended the match.
+        """
+        radius = self.config.blast_radius
+        footprint = {
+            (target[0] + dx, target[1] + dy)
+            for dx in range(-radius, radius + 1)
+            for dy in range(-radius, radius + 1)
+            if on_grid((target[0] + dx, target[1] + dy), self.config)
+        }
+        self.cells = (self.cells & footprint) or footprint
+
     def centroid(self) -> Coord:
         """The belief's centre of mass, as a single best guess."""
         count = len(self.cells)

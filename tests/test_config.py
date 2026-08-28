@@ -11,7 +11,7 @@ def test_defaults_match_the_spec() -> None:
     assert DEFAULT.ping_range == 12.0
     assert DEFAULT.passive_range == 18.0
     assert DEFAULT.blast_radius == 1
-    assert DEFAULT.hull == 1
+    assert DEFAULT.hull == 2
     assert DEFAULT.bearing_base_err_deg == 4.0
     assert DEFAULT.bearing_err_per_cell_deg == 0.6
     assert DEFAULT.round_cap == 50
@@ -31,8 +31,8 @@ def test_config_is_immutable() -> None:
 
 
 def test_a_variant_can_be_built_without_touching_the_default() -> None:
-    forgiving = replace(DEFAULT, hull=3)
-    assert isinstance(forgiving, GameConfig)
-    assert forgiving.hull == 3
-    assert forgiving.grid_size == DEFAULT.grid_size
-    assert DEFAULT.hull == 1
+    one_shot_kill = replace(DEFAULT, hull=1)
+    assert isinstance(one_shot_kill, GameConfig)
+    assert one_shot_kill.hull == 1
+    assert one_shot_kill.grid_size == DEFAULT.grid_size
+    assert DEFAULT.hull == 2
