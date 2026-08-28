@@ -7,7 +7,7 @@ from typing import Any
 
 import httpx
 
-from client.radar import render, supports_colour
+from client.radar import CLEAR_SCREEN, Plot, render, supports_colour
 from config import DEFAULT
 
 MENU = """
@@ -92,8 +92,17 @@ def open_seat(
     return client.post("/matches")
 
 
+def opponent_label(seat: dict[str, Any], solo_level: int | None) -> str:
+    """The one line of match identity worth keeping on screen after a redraw."""
+    opponent = seat.get("opponent", "human")
+    if opponent != "human":
+        return f"vs {opponent}, level {solo_level}"
+    return f"join code {seat['match_id']}"
+
+
 def play(base_url: str, join_code: str | None, solo_level: int | None = None) -> int:
     colour = supports_colour()
+    plot = Plot()
 
     with httpx.Client(base_url=base_url, timeout=15.0) as client:
         response = open_seat(client, join_code, solo_level)
@@ -105,17 +114,21 @@ def play(base_url: str, join_code: str | None, solo_level: int | None = None) ->
         match_id = seat["match_id"]
         headers = {"Authorization": f"Bearer {seat['token']}"}
         view = seat["view"]
+        banner = (
+            f"  S I L E N T   R U N N I N G   -   you are {seat['player_id']}, "
+            f"{opponent_label(seat, solo_level)}"
+        )
 
-        print("\n  S I L E N T   R U N N I N G")
-        print(f"  you are {seat['player_id']}")
-        if seat.get("opponent", "human") != "human":
-            print(f"  opponent: {seat['opponent']} (level {solo_level})")
-        elif join_code is None:
-            print(f"\n  share this join code:\n\n    {match_id}")
-        print(MENU)
+        if not colour:
+            print(f"\n{banner}")
+            print(MENU)
 
         while True:
-            print(render(view, colour=colour))
+            plot.record(view)
+            if colour:
+                print(CLEAR_SCREEN, end="")
+                print(banner)
+            print(render(view, colour=colour, plot=plot))
             if view["outcome"] != "ONGOING":
                 print()
                 return 0

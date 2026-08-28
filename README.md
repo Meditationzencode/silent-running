@@ -250,7 +250,7 @@ bots.
 ## Tests
 
 ```bash
-pytest                          # 478 tests
+pytest                          # 510 tests
 pytest --cov --cov-report=term  # 100% line and branch on engine + perception
 ```
 

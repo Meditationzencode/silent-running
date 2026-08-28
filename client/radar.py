@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from collections import deque
 from typing import Any
 
 from config import DEFAULT, GameConfig
@@ -15,14 +16,21 @@ YOU = "@"
 HEAT = "o"
 LAUNCH = "!"
 FIX = "X"
+ECHO_RECENT = ":"
+ECHO_STALE = ","
+
+HISTORY_DEPTH = 3
 
 RESET = "\x1b[0m"
+CLEAR_SCREEN = "\x1b[2J\x1b[H"
 STYLES = {
     EMPTY: "\x1b[90m",
     YOU: "\x1b[1;96m",
-    HEAT: "\x1b[93m",
+    HEAT: "\x1b[1;93m",
     LAUNCH: "\x1b[1;91m",
     FIX: "\x1b[1;95m",
+    ECHO_RECENT: "\x1b[33m",
+    ECHO_STALE: "\x1b[2;33m",
 }
 
 COMPASS_16 = (
@@ -76,19 +84,69 @@ def arc_cells(
     return cells
 
 
-def overlay(view: dict[str, Any], config: GameConfig = DEFAULT) -> dict[Coord, str]:
+class Plot:
+    """What you have heard lately, and where you were standing when you heard it.
+
+    An arc has to be drawn from the position it was taken from, so the origin is
+    kept with the contact. Two arcs recorded from two different cells intersect,
+    and that intersection is the whole of triangulation - the thing the bots do
+    with a belief set and a human previously had to do from memory.
+    """
+
+    def __init__(self, depth: int = HISTORY_DEPTH) -> None:
+        self.entries: deque[tuple[int, Coord, list[dict[str, Any]]]] = deque(
+            maxlen=depth
+        )
+
+    def record(self, view: dict[str, Any]) -> None:
+        """Remember this round's bearings. Ignores a round already recorded."""
+        round_number = view["round"]
+        if self.entries and self.entries[-1][0] == round_number:
+            return
+        self.entries.append(
+            (
+                round_number,
+                tuple(view["your_ship"]["position"]),
+                [c for c in view["contacts"] if c["bearing_deg"] is not None],
+            )
+        )
+
+    def aged(self) -> list[tuple[int, Coord, dict[str, Any]]]:
+        """Every remembered contact with its age in rounds, oldest first."""
+        newest = len(self.entries) - 1
+        return [
+            (newest - index, origin, contact)
+            for index, (_, origin, contacts) in enumerate(self.entries)
+            for contact in contacts
+        ]
+
+
+def arc_symbol(age: int, kind: str) -> str:
+    """Fresh contacts keep their kind; older ones fade into generic echoes."""
+    if age == 0:
+        return LAUNCH if kind == "LAUNCH_DETECTED" else HEAT
+    return ECHO_RECENT if age == 1 else ECHO_STALE
+
+
+def overlay(
+    view: dict[str, Any], config: GameConfig = DEFAULT, plot: Plot | None = None
+) -> dict[Coord, str]:
     """Map each cell to the symbol it should carry, strongest evidence winning."""
     own = tuple(view["your_ship"]["position"])
     marks: dict[Coord, str] = {}
 
-    for contact in view["contacts"]:
-        if contact["exact_position"] is not None or contact["bearing_deg"] is None:
-            continue
-        symbol = LAUNCH if contact["kind"] == "LAUNCH_DETECTED" else HEAT
+    remembered = (
+        plot.aged()
+        if plot is not None
+        else [(0, own, c) for c in view["contacts"] if c["bearing_deg"] is not None]
+    )
+
+    # Oldest first, so a fresh reading paints over a stale one on shared cells.
+    for age, origin, contact in sorted(remembered, key=lambda item: -item[0]):
         for cell in arc_cells(
-            own, contact["bearing_deg"], contact["range_bucket"], config
+            origin, contact["bearing_deg"], contact["range_bucket"], config
         ):
-            marks.setdefault(cell, symbol)
+            marks[cell] = arc_symbol(age, contact["kind"])
 
     for contact in view["contacts"]:
         if contact["exact_position"] is not None:
@@ -99,10 +157,13 @@ def overlay(view: dict[str, Any], config: GameConfig = DEFAULT) -> dict[Coord, s
 
 
 def grid_lines(
-    view: dict[str, Any], config: GameConfig = DEFAULT, colour: bool = True
+    view: dict[str, Any],
+    config: GameConfig = DEFAULT,
+    colour: bool = True,
+    plot: Plot | None = None,
 ) -> list[str]:
     """The board, drawn with y increasing upward so north is up."""
-    marks = overlay(view, config)
+    marks = overlay(view, config, plot)
     size = config.grid_size
 
     # Two header rows, tens over units, so a column can be read off directly.
@@ -151,7 +212,10 @@ def status_lines(view: dict[str, Any]) -> list[str]:
 
 
 def render(
-    view: dict[str, Any], config: GameConfig = DEFAULT, colour: bool = True
+    view: dict[str, Any],
+    config: GameConfig = DEFAULT,
+    colour: bool = True,
+    plot: Plot | None = None,
 ) -> str:
     """A whole frame: the board, then what it means."""
     opponent = OPPONENT_LABEL.get(view["opponent_status"], view["opponent_status"])
@@ -159,12 +223,15 @@ def render(
         "",
         f"  round {view['round']}   {view['phase']}   {opponent}",
         "",
-        *grid_lines(view, config, colour),
+        *grid_lines(view, config, colour, plot),
         "",
-        f"  {YOU} you    {HEAT} heat    {LAUNCH} launch    {FIX} exact fix",
+        f"  {YOU} you   {HEAT} heat   {LAUNCH} launch   {FIX} fix"
+        f"   {ECHO_RECENT} last round   {ECHO_STALE} older",
         "",
         *status_lines(view),
     ]
     if view["outcome"] != "ONGOING":
         frame += ["", f"  ===  {view['outcome']}  ==="]
+    else:
+        frame += ["", "  m <dir>   f <x> <y>   p ping   s silent   q resign"]
     return "\n".join(frame)

@@ -5,10 +5,14 @@ import re
 import pytest
 
 from client.radar import (
+    ECHO_RECENT,
+    ECHO_STALE,
     FIX,
     HEAT,
     YOU,
+    Plot,
     arc_cells,
+    arc_symbol,
     compass_name,
     describe,
     overlay,
@@ -151,6 +155,84 @@ def test_an_exact_fix_wins_over_an_arc_covering_the_same_cell() -> None:
     )
 
     assert marks[(16, 16)] == FIX
+
+
+# --- Memory: the plot that makes triangulation visible ---------------------
+
+
+def moved_view(round_number: int, position: list[int], bearing: float) -> dict:
+    return {
+        **QUIET_VIEW,
+        "round": round_number,
+        "your_ship": {"position": position, "hull": 2, "alive": True},
+        "contacts": [bearing_contact(bearing, "MEDIUM")],
+    }
+
+
+def test_a_plot_remembers_where_you_were_when_you_heard_it() -> None:
+    plot = Plot()
+
+    plot.record(moved_view(5, [4, 4], 50.0))
+    plot.record(moved_view(6, [8, 4], 75.0))
+
+    ages = plot.aged()
+    assert [(age, origin) for age, origin, _ in ages] == [(1, (4, 4)), (0, (8, 4))]
+
+
+def test_a_plot_ignores_a_round_it_has_already_seen() -> None:
+    """Polling re-fetches the same view; that must not age the history."""
+    plot = Plot()
+    plot.record(moved_view(5, [4, 4], 50.0))
+    plot.record(moved_view(5, [4, 4], 50.0))
+
+    assert len(plot.entries) == 1
+
+
+def test_a_plot_forgets_beyond_its_depth() -> None:
+    plot = Plot(depth=2)
+
+    for round_number in (1, 2, 3, 4):
+        plot.record(moved_view(round_number, [4, 4], 50.0))
+
+    assert len(plot.entries) == 2
+    assert [entry[0] for entry in plot.entries] == [3, 4]
+
+
+@pytest.mark.parametrize(
+    ("age", "kind", "symbol"),
+    [
+        (0, "PASSIVE_BEARING", HEAT),
+        (0, "LAUNCH_DETECTED", "!"),
+        (1, "PASSIVE_BEARING", ECHO_RECENT),
+        (2, "LAUNCH_DETECTED", ECHO_STALE),
+    ],
+)
+def test_a_contact_fades_with_age(age: int, kind: str, symbol: str) -> None:
+    assert arc_symbol(age, kind) == symbol
+
+
+def test_older_arcs_are_drawn_but_a_fresh_one_paints_over_them() -> None:
+    plot = Plot()
+    plot.record(moved_view(5, [4, 4], 50.0))
+    plot.record(moved_view(6, [4, 4], 50.0))
+
+    marks = overlay(moved_view(6, [4, 4], 50.0), plot=plot)
+    drawn = set(marks.values())
+
+    assert HEAT in drawn
+    assert ECHO_RECENT not in drawn, "an identical rerecorded arc should be overpainted"
+
+
+def test_two_arcs_from_different_positions_both_appear() -> None:
+    """The intersection of these is what a player is meant to read off."""
+    plot = Plot()
+    plot.record(moved_view(5, [4, 4], 50.0))
+    plot.record(moved_view(6, [12, 4], 130.0))
+
+    marks = overlay(moved_view(6, [12, 4], 130.0), plot=plot)
+
+    assert HEAT in marks.values()
+    assert ECHO_RECENT in marks.values()
 
 
 # --- The frame --------------------------------------------------------------
