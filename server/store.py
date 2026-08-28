@@ -5,6 +5,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from random import Random
 
+from ai import Bot
 from config import DEFAULT, GameConfig
 from engine import Action, GameState, PlayerId, RoundEvents, ShipState, new_match
 
@@ -27,10 +28,20 @@ class MatchRecord:
     tokens: dict[str, PlayerId] = field(default_factory=dict)
     pending: dict[PlayerId, Action] = field(default_factory=dict)
     history: list[RoundRecord] = field(default_factory=list)
+    opponent: Bot | None = None
+    """A bot holding the P2 seat in a solo match. It gets a PlayerView like anyone."""
 
     @property
     def is_full(self) -> bool:
-        return len(self.tokens) >= 2
+        return len(self.seats_taken) >= 2
+
+    @property
+    def seats_taken(self) -> set[PlayerId]:
+        """Seats that are spoken for, whether by a token or by a bot."""
+        taken = set(self.tokens.values())
+        if self.opponent is not None:
+            taken.add(PlayerId.P2)
+        return taken
 
     def seat(self, player: PlayerId) -> str:
         token = secrets.token_urlsafe(TOKEN_BYTES)
@@ -58,12 +69,15 @@ class MatchStore:
     def __init__(self) -> None:
         self._matches: dict[str, MatchRecord] = {}
 
-    def create(self, config: GameConfig = DEFAULT) -> tuple[MatchRecord, str]:
+    def create(
+        self, config: GameConfig = DEFAULT, opponent: Bot | None = None
+    ) -> tuple[MatchRecord, str]:
         """Open a match. The id is the join code, so it must be unguessable."""
         match_id = secrets.token_urlsafe(TOKEN_BYTES)
         record = MatchRecord(
             match_id=match_id,
             state=new_match(seed=secrets.randbits(SEED_BITS), config=config),
+            opponent=opponent,
         )
         token = record.seat(PlayerId.P1)
         self._matches[match_id] = record

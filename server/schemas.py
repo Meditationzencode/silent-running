@@ -2,11 +2,16 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from engine import Action, Fire, Move, Ping, PlayerId, RunSilent, ShipState
 from server.errors import ApiError
 from server.store import MatchRecord
+
+
+class CreateRequest(BaseModel):
+    opponent: Literal["human", "ai"] = "human"
+    level: int = Field(default=3, ge=1, le=5)
 
 
 class ActionRequest(BaseModel):
@@ -20,6 +25,7 @@ class SeatResponse(BaseModel):
     player_id: str
     token: str
     view: dict[str, Any]
+    opponent: str = "human"
 
 
 class ActionResponse(BaseModel):

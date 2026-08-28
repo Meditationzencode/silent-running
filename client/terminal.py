@@ -111,12 +111,16 @@ def wait_for_round(
         time.sleep(DEFAULT.poll_interval_s)
 
 
-def play(base_url: str, join_code: str | None) -> int:
+def play(base_url: str, join_code: str | None, solo_level: int | None = None) -> int:
     with httpx.Client(base_url=base_url, timeout=15.0) as client:
-        if join_code is None:
-            response = client.post("/matches")
-        else:
+        if join_code is not None:
             response = client.post(f"/matches/{join_code}/join")
+        elif solo_level is not None:
+            response = client.post(
+                "/matches", json={"opponent": "ai", "level": solo_level}
+            )
+        else:
+            response = client.post("/matches")
 
         if response.status_code not in (200, 201):
             print(f"could not start: {response.json().get('detail', response.text)}")
@@ -128,7 +132,9 @@ def play(base_url: str, join_code: str | None) -> int:
         view = seat["view"]
 
         print(f"\nyou are {seat['player_id']}")
-        if join_code is None:
+        if seat.get("opponent", "human") != "human":
+            print(f"opponent: {seat['opponent']} (level {solo_level})")
+        elif join_code is None:
             print(f"share this join code:\n\n  {match_id}\n")
         print(HELP)
 
@@ -150,11 +156,20 @@ def play(base_url: str, join_code: str | None) -> int:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="silent-running")
     parser.add_argument("--server", default="http://127.0.0.1:8000")
-    parser.add_argument("--join", metavar="CODE", default=None)
+    seat = parser.add_mutually_exclusive_group()
+    seat.add_argument("--join", metavar="CODE", default=None)
+    seat.add_argument(
+        "--solo",
+        type=int,
+        metavar="LEVEL",
+        choices=range(1, 6),
+        default=None,
+        help="play a bot: 1 Drifter, 2 Reactor, 3 Tracker, 4 Hunter, 5 Ghost",
+    )
     args = parser.parse_args(argv)
 
     try:
-        return play(args.server, args.join)
+        return play(args.server, args.join, args.solo)
     except KeyboardInterrupt:
         print("\nbye")
         return 130

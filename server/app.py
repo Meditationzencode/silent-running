@@ -1,15 +1,28 @@
 from __future__ import annotations
 
+import random
+import secrets
 from typing import Annotated, Any
 
 from fastapi import FastAPI, Header, status
 
-from engine import Outcome, PlayerId, resign, resolve, validate_action
+from ai import make_bot
+from engine import (
+    Action,
+    InvalidAction,
+    Outcome,
+    PlayerId,
+    RunSilent,
+    resign,
+    resolve,
+    validate_action,
+)
 from perception import to_payload, view_for
 from server.errors import ApiError, register_error_handlers
 from server.schemas import (
     ActionRequest,
     ActionResponse,
+    CreateRequest,
     SeatResponse,
     history_payload,
     to_action,
@@ -59,6 +72,31 @@ def _view(record: MatchRecord, player: PlayerId) -> dict[str, Any]:
     )
 
 
+def _bot_action(record: MatchRecord) -> Action:
+    """Ask the seated bot for its move, from the same fogged view a human gets.
+
+    Built from the state *before* the human's action is applied, so the bot is
+    choosing blind against a simultaneous opponent exactly as the rules intend.
+
+    An illegal answer is replaced with Run Silent rather than failing the
+    human's request: it is the same safe default a player gets for missing a
+    turn, and the alternative is a bot bug reading as a 400 on someone else's
+    perfectly good action.
+    """
+    view = view_for(
+        record.state,
+        PlayerId.P2,
+        record.view_rng(PlayerId.P2),
+        phase="AWAITING_ACTIONS",
+    )
+    action = record.opponent.choose_action(view)  # type: ignore[union-attr]
+    try:
+        validate_action(action, record.state.config)
+    except InvalidAction:
+        return RunSilent()
+    return action
+
+
 def _resolve_round(record: MatchRecord) -> None:
     actions = dict(record.pending)
     new_state, events = resolve(
@@ -80,14 +118,20 @@ def _resolve_round(record: MatchRecord) -> None:
 
 
 @app.post("/matches", status_code=status.HTTP_201_CREATED)
-def create_match() -> SeatResponse:
-    """Create a match. The returned id doubles as the join code."""
-    record, token = store.create()
+def create_match(body: CreateRequest | None = None) -> SeatResponse:
+    """Create a match, against a friend by code or against a bot straight away."""
+    request = body or CreateRequest()
+    opponent = None
+    if request.opponent == "ai":
+        opponent = make_bot(request.level, random.Random(secrets.randbits(64)))
+
+    record, token = store.create(opponent=opponent)
     return SeatResponse(
         match_id=record.match_id,
         player_id=PlayerId.P1.value,
         token=token,
         view=_view(record, PlayerId.P1),
+        opponent="human" if opponent is None else opponent.name,
     )
 
 
@@ -134,6 +178,9 @@ def submit_action(
     action = to_action(body)
     validate_action(action, record.state.config)
     record.pending[player] = action
+
+    if record.opponent is not None and PlayerId.P2 not in record.pending:
+        record.pending[PlayerId.P2] = _bot_action(record)
 
     if len(record.pending) == 2:
         _resolve_round(record)

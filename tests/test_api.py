@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
+import random
 from collections.abc import Iterator
 
 import pytest
 from fastapi.testclient import TestClient
 
+from ai import make_bot
 from engine import Outcome, PlayerId
 from server.app import app, store
 from tests.strategies import coordinates_in
@@ -343,6 +345,124 @@ def test_history_is_the_defogged_record_once_the_match_is_over(
     assert entry["actions"]["P2"] == {"type": "PING"}
     assert set(entry["ships_after"]) == {"P1", "P2"}
     assert set(body["final_positions"]) == {"P1", "P2"}
+
+
+# --- Solo play against a bot ----------------------------------------------
+
+
+def test_creating_a_solo_match_seats_a_bot(client: TestClient) -> None:
+    response = client.post("/matches", json={"opponent": "ai", "level": 4})
+
+    assert response.status_code == 201
+    assert response.json()["opponent"] == "Hunter"
+    assert response.json()["player_id"] == "P1"
+
+
+def test_a_solo_match_cannot_be_joined(client: TestClient) -> None:
+    """The second seat is taken, even though no token was ever issued for it."""
+    match_id = client.post("/matches", json={"opponent": "ai"}).json()["match_id"]
+
+    response = client.post(f"/matches/{match_id}/join")
+
+    assert response.status_code == 409
+    assert response.json()["error"] == "match_full"
+
+
+def test_a_solo_round_resolves_on_the_humans_action_alone(client: TestClient) -> None:
+    created = client.post("/matches", json={"opponent": "ai", "level": 1}).json()
+    match_id, token = created["match_id"], created["token"]
+
+    response = act(client, match_id, token, type="RUN_SILENT")
+
+    assert response.status_code == 200
+    assert response.json() == {"round": 2, "phase": "RESOLVED"}
+
+
+def test_the_bot_cannot_see_the_humans_action_for_the_same_round(
+    client: TestClient,
+) -> None:
+    """Simultaneity, tested rather than asserted.
+
+    Two matches are forced into an identical position with identically seeded
+    bots, then the human does something completely different in each. If the
+    bot's own move is the same both times, it cannot have been influenced by
+    what the human submitted in that round.
+    """
+    first = client.post("/matches", json={"opponent": "ai", "level": 3}).json()
+    second = client.post("/matches", json={"opponent": "ai", "level": 3}).json()
+
+    record_a, record_b = store.get(first["match_id"]), store.get(second["match_id"])
+    record_b.state = record_a.state
+    record_a.opponent = make_bot(3, random.Random(99))
+    record_b.opponent = make_bot(3, random.Random(99))
+
+    act(client, first["match_id"], first["token"], type="MOVE", direction="N")
+    act(client, second["match_id"], second["token"], type="FIRE", target=[0, 0])
+
+    assert (
+        record_a.history[0].actions[PlayerId.P2]
+        == record_b.history[0].actions[PlayerId.P2]
+    )
+
+
+@pytest.mark.parametrize("level", [1, 2, 3, 4, 5])
+def test_every_level_can_be_played_to_a_conclusion_over_http(
+    client: TestClient, level: int
+) -> None:
+    created = client.post("/matches", json={"opponent": "ai", "level": level}).json()
+    match_id, token = created["match_id"], created["token"]
+
+    for _ in range(60):
+        if view_of(client, match_id, token)["outcome"] != "ONGOING":
+            break
+        assert act(client, match_id, token, type="PING").status_code == 200
+
+    assert view_of(client, match_id, token)["outcome"] in ("WIN", "LOSS", "DRAW")
+    assert (
+        client.get(f"/matches/{match_id}/history", headers=auth(token)).status_code
+        == 200
+    )
+
+
+@pytest.mark.parametrize("level", [0, 6, -1])
+def test_an_out_of_range_level_is_400(client: TestClient, level: int) -> None:
+    response = client.post("/matches", json={"opponent": "ai", "level": level})
+
+    assert response.status_code == 400
+    assert response.json()["error"] == "malformed_request"
+
+
+def test_creating_a_match_without_a_body_still_means_a_human_opponent(
+    client: TestClient,
+) -> None:
+    response = client.post("/matches")
+
+    assert response.status_code == 201
+    assert response.json()["opponent"] == "human"
+
+
+def test_a_solo_view_never_leaks_the_bots_position(client: TestClient) -> None:
+    created = client.post("/matches", json={"opponent": "ai", "level": 5}).json()
+    match_id, token = created["match_id"], created["token"]
+
+    for _ in range(10):
+        if view_of(client, match_id, token)["outcome"] != "ONGOING":
+            break
+        act(client, match_id, token, type="MOVE", direction="E")
+
+        body = view_of(client, match_id, token)
+        record = store.get(match_id)
+        own = record.state.ships[PlayerId.P1].position
+        enemy = record.state.ships[PlayerId.P2].position
+        granted = {
+            tuple(contact["exact_position"])
+            for contact in body["contacts"]
+            if contact["kind"] in EXACT_KINDS
+        }
+
+        assert set(coordinates_in(body)) <= {own} | granted
+        if enemy not in granted and enemy != own:
+            assert enemy not in coordinates_in(body)
 
 
 # --- A whole match over HTTP ----------------------------------------------
