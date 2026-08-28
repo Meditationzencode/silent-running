@@ -22,7 +22,13 @@ pip install -r requirements.txt
 uvicorn main:app --reload
 ```
 
-Then, in two more terminals:
+Then play a bot in one terminal:
+
+```bash
+python -m client.terminal --solo 3        # 1 Drifter … 5 Ghost
+```
+
+or a friend, in two:
 
 ```bash
 python -m client.terminal                 # prints a join code
@@ -43,23 +49,29 @@ once. Every action trades information for exposure:
 
 A ping outside range tells you nothing and still announces exactly where you are.
 
+A real match against Hunter, abridged:
+
 ```
-round 7  [RESOLVED]
-  you: (11,14)  hull 1
-  * passive bearing: 42.3 deg, close
+round 3  [RESOLVED]
+  you: (11,4)  hull 1
+  * passive bearing: 18.4 deg, medium
+action> p
 
-action> f 14 16
-  waiting for your opponent..
+round 4  [RESOLVED]
+  you: (11,4)  hull 1
+  * active fix: exact fix at (18,11)
+action> m SW
 
-round 8  [RESOLVED]
-  you: (11,14)  hull 1
-  >> your torpedo connected
+round 6  [RESOLVED]
+  you: (9,2)  hull 0
+  >> you were hit
+  * launch detected: 30.6 deg, far
 
-=== WIN ===
+=== LOSS ===
 ```
 
-That torpedo was fired at a cell inferred from two fuzzy bearings. Guessing right, in the
-dark, is the whole game.
+The ping in round 3 bought an exact position and sold one. Two rounds later the bot put
+a torpedo through the cell that ping had lit up. That trade is the whole game.
 
 ---
 
@@ -186,6 +198,37 @@ comment would only have hoped. `git log -p` is the design record.
 
 ---
 
+## The opponents
+
+Five levels, and the difficulty is never information. A bot receives exactly the fogged
+`PlayerView` a human does and returns one action — so the leak invariant above already
+proves no bot at any level can see through the fog. What separates them is how well they
+infer, and how well they act on the inference.
+
+| | | |
+|---|---|---|
+| 1 | **Drifter** | Moves and fires at random. Never pings. A warm body in the seat. |
+| 2 | **Reactor** | Silent until it hears something, then moves and fires that way. Forgets immediately, so it never triangulates. |
+| 3 | **Tracker** | Holds a belief over enemy cells, narrows it with each bearing, and fires when a blast would cover enough of it. |
+| 4 | **Hunter** | Aims where a dodge will land rather than where they were, and moves off the cell its own ping just advertised. |
+| 5 | **Ghost** | Knows Hunter runs when pinged, and drops a torpedo along the line of flight — covering both the cell they hold and the one they flee to. |
+
+Measured over both seatings of 80 seeds, higher beats lower in every pairing:
+
+| | vs Drifter | vs Reactor | vs Tracker | vs Hunter |
+|---|---|---|---|---|
+| **Reactor** | 96.7% | | | |
+| **Tracker** | 95.6% | 56.6% | | |
+| **Hunter** | 95.3% | 59.8% | 80.9% | |
+| **Ghost** | 95.9% | 58.3% | 70.5% | 90.6% |
+
+Tracker over Reactor is the thinnest step and it is not a tuning artefact — sweeping
+Tracker's firing threshold across its whole useful range moves it only between 52% and
+56%. A quiet counter-puncher is genuinely close to a belief tracker that moves every
+round. Relatedly, silence is strong enough that letting Tracker run silent while blind
+flipped Hunter-over-Tracker from 81% to 17%; Tracker keeps moving because not knowing
+that is what should keep it below the levels above.
+
 ## Status
 
 | | |
@@ -194,19 +237,20 @@ comment would only have hoped. `git log -p` is the design record.
 | Perception layer + leak invariant + determinism proof | built |
 | REST API, six endpoints, token-scoped views | built |
 | Terminal client — polling, actions, resign | built |
-| AI opponents (five escalating levels) | planned |
+| Five AI opponents, playable over HTTP | built |
 | Radar-style terminal UI | planned |
 | Timeouts, disconnect grace, reconnection | planned |
 | Public deployment | planned |
 
-Two people can play a full match over HTTP today. Solo play against a bot is next.
+Two people can play a full match over HTTP today, or one person against any of the five
+bots.
 
 ---
 
 ## Tests
 
 ```bash
-pytest                          # 426 tests
+pytest                          # 478 tests
 pytest --cov --cov-report=term  # 100% line and branch on engine + perception
 ```
 
