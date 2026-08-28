@@ -7,43 +7,16 @@ from typing import Any
 
 import httpx
 
+from client.radar import render, supports_colour
 from config import DEFAULT
 
-BUCKETS = {"CLOSE": "close", "MEDIUM": "medium", "FAR": "far"}
-HELP = "  s = run silent | m <DIR> = move | p = ping | f <x> <y> = fire | q = resign"
-
-
-def describe(contact: dict[str, Any]) -> str:
-    kind = contact["kind"].replace("_", " ").lower()
-    if contact["exact_position"] is not None:
-        x, y = contact["exact_position"]
-        return f"{kind}: exact fix at ({x},{y})"
-    return (
-        f"{kind}: {contact['bearing_deg']:.1f} deg, "
-        f"{BUCKETS[contact['range_bucket']]}"
-    )
-
-
-def render(view: dict[str, Any]) -> str:
-    x, y = view["your_ship"]["position"]
-    lines = [
-        "",
-        f"round {view['round']}  [{view['phase']}]",
-        f"  you: ({x},{y})  hull {view['your_ship']['hull']}",
-    ]
-
-    result = view["last_result"]
-    if result is not None:
-        if result["you_hit_enemy"]:
-            lines.append("  >> your torpedo connected")
-        if result["you_were_hit"]:
-            lines.append("  >> you were hit")
-
-    if view["contacts"]:
-        lines.extend("  * " + describe(contact) for contact in view["contacts"])
-    else:
-        lines.append("  * no contacts")
-    return "\n".join(lines)
+MENU = """
+  m <DIR>     move two cells   (N NE E SE S SW W NW)
+  f <X> <Y>   fire a 3x3 blast centred on that cell
+  p           ping  - exact fix if they are within 12, and they get yours
+  s           run silent - hold position, listen, emit nothing
+  q           resign
+"""
 
 
 def parse_action(line: str) -> dict[str, Any] | None:
@@ -78,12 +51,10 @@ def prompt() -> dict[str, Any] | None:
         action = parse_action(line)
         if action is not None:
             return action
-        print(HELP)
+        print(MENU)
 
 
-def submit_turn(
-    client: httpx.Client, match_id: str, headers: dict[str, str]
-) -> bool:
+def submit_turn(client: httpx.Client, match_id: str, headers: dict[str, str]) -> bool:
     while True:
         action = prompt()
         if action is None:
@@ -111,17 +82,21 @@ def wait_for_round(
         time.sleep(DEFAULT.poll_interval_s)
 
 
-def play(base_url: str, join_code: str | None, solo_level: int | None = None) -> int:
-    with httpx.Client(base_url=base_url, timeout=15.0) as client:
-        if join_code is not None:
-            response = client.post(f"/matches/{join_code}/join")
-        elif solo_level is not None:
-            response = client.post(
-                "/matches", json={"opponent": "ai", "level": solo_level}
-            )
-        else:
-            response = client.post("/matches")
+def open_seat(
+    client: httpx.Client, join_code: str | None, solo_level: int | None
+) -> httpx.Response:
+    if join_code is not None:
+        return client.post(f"/matches/{join_code}/join")
+    if solo_level is not None:
+        return client.post("/matches", json={"opponent": "ai", "level": solo_level})
+    return client.post("/matches")
 
+
+def play(base_url: str, join_code: str | None, solo_level: int | None = None) -> int:
+    colour = supports_colour()
+
+    with httpx.Client(base_url=base_url, timeout=15.0) as client:
+        response = open_seat(client, join_code, solo_level)
         if response.status_code not in (200, 201):
             print(f"could not start: {response.json().get('detail', response.text)}")
             return 1
@@ -131,17 +106,18 @@ def play(base_url: str, join_code: str | None, solo_level: int | None = None) ->
         headers = {"Authorization": f"Bearer {seat['token']}"}
         view = seat["view"]
 
-        print(f"\nyou are {seat['player_id']}")
+        print("\n  S I L E N T   R U N N I N G")
+        print(f"  you are {seat['player_id']}")
         if seat.get("opponent", "human") != "human":
-            print(f"opponent: {seat['opponent']} (level {solo_level})")
+            print(f"  opponent: {seat['opponent']} (level {solo_level})")
         elif join_code is None:
-            print(f"share this join code:\n\n  {match_id}\n")
-        print(HELP)
+            print(f"\n  share this join code:\n\n    {match_id}")
+        print(MENU)
 
         while True:
-            print(render(view))
+            print(render(view, colour=colour))
             if view["outcome"] != "ONGOING":
-                print(f"\n=== {view['outcome']} ===\n")
+                print()
                 return 0
 
             acted_round = view["round"]
