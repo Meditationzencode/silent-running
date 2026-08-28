@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import secrets
-from collections.abc import Mapping
+import time
+from collections import Counter
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from random import Random
 
@@ -30,6 +32,14 @@ class MatchRecord:
     history: list[RoundRecord] = field(default_factory=list)
     opponent: Bot | None = None
     """A bot holding the P2 seat in a solo match. It gets a PlayerView like anyone."""
+
+    last_seen: dict[PlayerId, float] = field(default_factory=dict)
+    """When each player last made an authenticated request. Polling is the heartbeat."""
+
+    timeouts: Counter[PlayerId] = field(default_factory=Counter)
+    """Consecutive rounds missed. Reset by acting, not by merely being present."""
+
+    round_opened_at: float = 0.0
 
     @property
     def is_full(self) -> bool:
@@ -66,8 +76,10 @@ class MatchRecord:
 
 
 class MatchStore:
-    def __init__(self) -> None:
+    def __init__(self, clock: Callable[[], float] = time.monotonic) -> None:
         self._matches: dict[str, MatchRecord] = {}
+        self.clock = clock
+        """Injectable so tests can move time without sleeping through a match."""
 
     def create(
         self, config: GameConfig = DEFAULT, opponent: Bot | None = None
@@ -78,6 +90,7 @@ class MatchStore:
             match_id=match_id,
             state=new_match(seed=secrets.randbits(SEED_BITS), config=config),
             opponent=opponent,
+            round_opened_at=self.clock(),
         )
         token = record.seat(PlayerId.P1)
         self._matches[match_id] = record
